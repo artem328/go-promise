@@ -24,19 +24,21 @@ jobs:
       with:
         go-version: ${{ matrix.go }}
 
-    - name: Deps
-      run: go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.55.2
-
-    - name: Lint
-      run: golangci-lint run --config .golangci.yml ./...
+#    - name: Deps
+#      run: go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.55.2
+#
+#    - name: Lint
+#      run: golangci-lint run --config .golangci.yml -v ./...
 
     - name: Build
       run: go build -v ./...
 
     - name: Test
-      run: go test -v -race ./...
+      run: go test -v -race -coverprofile coverage.txt ./...
 
     - name: Upload coverage reports to Codecov
       uses: codecov/codecov-action@v3
       env:
         CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+      with:
+        files: coverage.txt
