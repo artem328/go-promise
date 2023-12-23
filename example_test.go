@@ -8,6 +8,52 @@ import (
 	"github.com/artem328/go-promise"
 )
 
+func Example() {
+	p := promise.New(func(resolve func(int), reject func(error)) {
+		fmt.Println("entering p")
+		time.Sleep(500 * time.Millisecond)
+		fmt.Println("resolving from p")
+		resolve(1)
+	}).
+		Then(func(i int) *promise.Promise[int] {
+			fmt.Println("t1 value received:", i)
+			p, resolve, _ := promise.WithResolvers[int]()
+
+			go func() {
+				time.Sleep(500 * time.Millisecond)
+				fmt.Println("resolving from t1")
+				resolve(i + 9)
+			}()
+
+			return p
+		}).
+		Then(func(i int) *promise.Promise[int] {
+			fmt.Println("t2 value received:", i)
+			fmt.Println("t2 resolving")
+			return promise.Resolve(i * 2)
+		}).
+		Catch(func(err error) *promise.Promise[int] {
+			fmt.Println("we failed somewhere in chain", err)
+			return nil
+		}).
+		Finally(func() *promise.Promise[int] {
+			fmt.Println("all done, let's see the result")
+			return nil
+		})
+
+	fmt.Println(p.Await())
+
+	// Output:
+	// entering p
+	// resolving from p
+	// t1 value received: 1
+	// resolving from t1
+	// t2 value received: 10
+	// t2 resolving
+	// all done, let's see the result
+	// 20 <nil>
+}
+
 func ExampleNew() {
 	sayHello := func() (string, error) { return "hello", nil }
 
