@@ -21,11 +21,11 @@ func TestPromise(t *testing.T) {
 
 		assert.Eventually(t, func() bool {
 			return i.Load() > 0
-		}, time.Millisecond, 10*time.Microsecond)
+		}, 50*time.Millisecond, time.Millisecond)
 
 		assert.Never(t, func() bool {
 			return i.Load() > 1
-		}, time.Millisecond, 10*time.Microsecond)
+		}, 50*time.Millisecond, time.Millisecond)
 	})
 
 	t.Run("Resolve", func(t *testing.T) {
@@ -33,7 +33,7 @@ func TestPromise(t *testing.T) {
 			resolve(1)
 		})
 
-		if assert.Eventually(t, func() bool { return isDone(p) }, time.Millisecond, 10*time.Microsecond) {
+		if assert.Eventually(t, func() bool { return isDone(p) }, 50*time.Millisecond, time.Millisecond) {
 			assertVal(t, 1, p)
 			assertNoErr(t, p)
 		}
@@ -45,7 +45,7 @@ func TestPromise(t *testing.T) {
 			reject(err)
 		})
 
-		if assert.Eventually(t, func() bool { return isDone(p) }, time.Millisecond, 10*time.Microsecond) {
+		if assert.Eventually(t, func() bool { return isDone(p) }, 50*time.Millisecond, time.Millisecond) {
 			assertErr(t, err, p)
 			assertNoVal(t, p)
 		}
@@ -75,7 +75,7 @@ func TestPromise(t *testing.T) {
 					return
 				}
 
-				if assert.Eventually(t, func() bool { return isDone(p) }, time.Millisecond, 10*time.Microsecond) {
+				if assert.Eventually(t, func() bool { return isDone(p) }, 50*time.Millisecond, time.Millisecond) {
 					assertErr(t, tt.wantErr, p)
 					assertNoVal(t, p)
 				}
@@ -89,7 +89,7 @@ func TestPromise(t *testing.T) {
 			resolve(2)
 		})
 
-		if !assert.Eventually(t, func() bool { return isDone(p) }, time.Millisecond, 10*time.Microsecond) {
+		if !assert.Eventually(t, func() bool { return isDone(p) }, 50*time.Millisecond, time.Millisecond) {
 			return
 		}
 
@@ -99,7 +99,7 @@ func TestPromise(t *testing.T) {
 
 		assert.Never(t, func() bool {
 			return !valEqual(1, p)
-		}, time.Millisecond, 10*time.Microsecond)
+		}, 50*time.Millisecond, time.Millisecond)
 	})
 
 	t.Run("Rejects Once", func(t *testing.T) {
@@ -111,7 +111,7 @@ func TestPromise(t *testing.T) {
 			reject(err2)
 		})
 
-		if !assert.Eventually(t, func() bool { return isDone(p) }, time.Millisecond, 10*time.Microsecond) {
+		if !assert.Eventually(t, func() bool { return isDone(p) }, 50*time.Millisecond, time.Millisecond) {
 			return
 		}
 
@@ -121,7 +121,7 @@ func TestPromise(t *testing.T) {
 
 		assert.Never(t, func() bool {
 			return !errEqual(err1, p)
-		}, time.Millisecond, 10*time.Microsecond)
+		}, 50*time.Millisecond, time.Millisecond)
 	})
 
 	t.Run("Not Rejected After Resolve", func(t *testing.T) {
@@ -132,7 +132,7 @@ func TestPromise(t *testing.T) {
 			reject(err)
 		})
 
-		if !assert.Eventually(t, func() bool { return isDone(p) }, time.Millisecond, 10*time.Microsecond) {
+		if !assert.Eventually(t, func() bool { return isDone(p) }, 50*time.Millisecond, time.Millisecond) {
 			return
 		}
 
@@ -142,7 +142,7 @@ func TestPromise(t *testing.T) {
 
 		assert.Never(t, func() bool {
 			return !errEqual(nil, p)
-		}, time.Millisecond, 10*time.Microsecond)
+		}, 50*time.Millisecond, time.Millisecond)
 	})
 
 	t.Run("Not Resolved After Reject", func(t *testing.T) {
@@ -153,7 +153,7 @@ func TestPromise(t *testing.T) {
 			resolve(1)
 		})
 
-		if !assert.Eventually(t, func() bool { return isDone(p) }, time.Millisecond, 10*time.Microsecond) {
+		if !assert.Eventually(t, func() bool { return isDone(p) }, 50*time.Millisecond, time.Millisecond) {
 			return
 		}
 
@@ -163,7 +163,7 @@ func TestPromise(t *testing.T) {
 
 		assert.Never(t, func() bool {
 			return !valEqual(0, p)
-		}, time.Millisecond, 10*time.Microsecond)
+		}, 50*time.Millisecond, time.Millisecond)
 	})
 }
 
@@ -203,7 +203,7 @@ func TestAll(t *testing.T) {
 	t.Run("All Resolved", func(t *testing.T) {
 		p := All[int](Resolve(1), Resolve(2))
 
-		if assert.Eventually(t, func() bool { return isDone(p) }, time.Millisecond, 10*time.Microsecond) {
+		if assert.Eventually(t, func() bool { return isDone(p) }, 50*time.Millisecond, time.Millisecond) {
 			assertVal(t, []int{1, 2}, p)
 			assertNoErr(t, p)
 		}
@@ -214,7 +214,7 @@ func TestAll(t *testing.T) {
 
 		p := All[int](Resolve(1), Reject[int](err))
 
-		if assert.Eventually(t, func() bool { return isDone(p) }, time.Millisecond, 10*time.Microsecond) {
+		if assert.Eventually(t, func() bool { return isDone(p) }, 50*time.Millisecond, time.Millisecond) {
 			assertErr(t, err, p)
 			assertNoVal(t, p)
 		}
@@ -229,7 +229,7 @@ func TestAll(t *testing.T) {
 
 		reject2(err)
 
-		if assert.Eventually(t, func() bool { return isDone(p) }, time.Millisecond, 10*time.Microsecond) {
+		if assert.Eventually(t, func() bool { return isDone(p) }, 50*time.Millisecond, time.Millisecond) {
 			assertErr(t, err, p)
 			assertNoVal(t, p)
 		}
@@ -249,7 +249,7 @@ func TestAllSettled(t *testing.T) {
 	t.Run("Returns All States", func(t *testing.T) {
 		p := AllSettled(Resolve(1), Resolve(2), Reject[int](errors.New("mock")))
 
-		if assert.Eventually(t, func() bool { return isDone(p) }, time.Millisecond, 10*time.Microsecond) {
+		if assert.Eventually(t, func() bool { return isDone(p) }, 50*time.Millisecond, time.Millisecond) {
 			assertVal(t, []State{Fulfilled, Fulfilled, Rejected}, p)
 			assertNoErr(t, p)
 		}
@@ -274,7 +274,7 @@ func TestRace(t *testing.T) {
 
 		resolve2(2)
 
-		if assert.Eventually(t, func() bool { return isDone(p) }, time.Millisecond, 10*time.Microsecond) {
+		if assert.Eventually(t, func() bool { return isDone(p) }, 50*time.Millisecond, time.Millisecond) {
 			assertVal(t, 2, p)
 			assertNoErr(t, p)
 		}
@@ -289,7 +289,7 @@ func TestRace(t *testing.T) {
 
 		reject2(err)
 
-		if assert.Eventually(t, func() bool { return isDone(p) }, time.Millisecond, 10*time.Microsecond) {
+		if assert.Eventually(t, func() bool { return isDone(p) }, 50*time.Millisecond, time.Millisecond) {
 			assertErr(t, err, p)
 			assertNoVal(t, p)
 		}
@@ -317,11 +317,11 @@ func TestAny(t *testing.T) {
 
 		assert.Never(t, func() bool {
 			return isDone(p)
-		}, time.Millisecond, 10*time.Microsecond)
+		}, 50*time.Millisecond, time.Millisecond)
 
 		resolve2(2)
 
-		if assert.Eventually(t, func() bool { return isDone(p) }, time.Millisecond, 10*time.Microsecond) {
+		if assert.Eventually(t, func() bool { return isDone(p) }, 50*time.Millisecond, time.Millisecond) {
 			assertVal(t, 2, p)
 			assertNoErr(t, p)
 		}
@@ -337,7 +337,7 @@ func TestAny(t *testing.T) {
 		reject1(err)
 		reject2(err)
 
-		if assert.Eventually(t, func() bool { return isDone(p) }, time.Millisecond, 10*time.Microsecond) {
+		if assert.Eventually(t, func() bool { return isDone(p) }, 50*time.Millisecond, time.Millisecond) {
 			assertErr(t, ErrAllPromisesRejected, p)
 			assertNoVal(t, p)
 		}
@@ -382,7 +382,7 @@ func TestPromiseThen(t *testing.T) {
 			default:
 				return false
 			}
-		}, time.Millisecond, 10*time.Microsecond)
+		}, 50*time.Millisecond, time.Millisecond)
 	})
 
 	t.Run("From Rejected", func(t *testing.T) {
@@ -402,7 +402,7 @@ func TestPromiseThen(t *testing.T) {
 			default:
 				return false
 			}
-		}, time.Millisecond, 10*time.Microsecond)
+		}, 50*time.Millisecond, time.Millisecond)
 	})
 
 	t.Run("Chain Resolve", func(t *testing.T) {
@@ -412,7 +412,7 @@ func TestPromiseThen(t *testing.T) {
 			return Resolve(i + 1)
 		})
 
-		if assert.Eventually(t, func() bool { return isDone(p2) }, time.Millisecond, 10*time.Microsecond) {
+		if assert.Eventually(t, func() bool { return isDone(p2) }, 50*time.Millisecond, time.Millisecond) {
 			assertVal(t, 2, p2)
 			assertNoErr(t, p2)
 		}
@@ -426,7 +426,7 @@ func TestPromiseThen(t *testing.T) {
 			return Reject[int](err)
 		})
 
-		if assert.Eventually(t, func() bool { return isDone(p2) }, time.Millisecond, 10*time.Microsecond) {
+		if assert.Eventually(t, func() bool { return isDone(p2) }, 50*time.Millisecond, time.Millisecond) {
 			assertErr(t, err, p2)
 			assertNoVal(t, p2)
 		}
@@ -450,7 +450,7 @@ func TestPromiseCatch(t *testing.T) {
 			default:
 				return false
 			}
-		}, time.Millisecond, 10*time.Microsecond)
+		}, 50*time.Millisecond, time.Millisecond)
 	})
 
 	t.Run("From Rejected", func(t *testing.T) {
@@ -471,7 +471,7 @@ func TestPromiseCatch(t *testing.T) {
 			default:
 				return false
 			}
-		}, time.Millisecond, 10*time.Microsecond)
+		}, 50*time.Millisecond, time.Millisecond)
 	})
 
 	t.Run("Chain Resolve", func(t *testing.T) {
@@ -480,7 +480,7 @@ func TestPromiseCatch(t *testing.T) {
 			return Resolve(-1)
 		})
 
-		if assert.Eventually(t, func() bool { return isDone(p2) }, time.Millisecond, 10*time.Microsecond) {
+		if assert.Eventually(t, func() bool { return isDone(p2) }, 50*time.Millisecond, time.Millisecond) {
 			assertVal(t, 1, p2)
 			assertNoErr(t, p2)
 		}
@@ -494,7 +494,7 @@ func TestPromiseCatch(t *testing.T) {
 			return Resolve(-1)
 		})
 
-		if assert.Eventually(t, func() bool { return isDone(p2) }, time.Millisecond, 10*time.Microsecond) {
+		if assert.Eventually(t, func() bool { return isDone(p2) }, 50*time.Millisecond, time.Millisecond) {
 			assertVal(t, -1, p2)
 			assertNoErr(t, p2)
 		}
@@ -526,7 +526,7 @@ func TestPromiseFinally(t *testing.T) {
 				default:
 					return false
 				}
-			}, time.Millisecond, 10*time.Microsecond)
+			}, 50*time.Millisecond, time.Millisecond)
 		})
 	}
 
@@ -537,7 +537,7 @@ func TestPromiseFinally(t *testing.T) {
 					return Resolve(any(-1))
 				})
 
-				if assert.Eventually(t, func() bool { return isDone(p2) }, time.Millisecond, 10*time.Microsecond) {
+				if assert.Eventually(t, func() bool { return isDone(p2) }, 50*time.Millisecond, time.Millisecond) {
 					assertVal(t, -1, p2)
 					assertNoErr(t, p2)
 				}

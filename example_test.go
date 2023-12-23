@@ -79,7 +79,7 @@ func ExampleAllSettled() {
 
 func ExampleRace_fulfilled() {
 	p1 := promise.New(func(resolve func(string), _ func(error)) {
-		time.Sleep(time.Second)
+		time.Sleep(500 * time.Millisecond)
 		fmt.Println("resolving p1")
 		resolve("p1")
 	})
@@ -92,14 +92,17 @@ func ExampleRace_fulfilled() {
 
 	fmt.Println(p.Await())
 
+	time.Sleep(time.Second)
+
 	// Output:
 	// resolving p2
 	// p2 <nil>
+	// resolving p1
 }
 
 func ExampleRace_rejected() {
 	p1 := promise.New(func(resolve func(string), _ func(error)) {
-		time.Sleep(time.Second)
+		time.Sleep(500 * time.Millisecond)
 		fmt.Println("resolving p1")
 		resolve("p1")
 	})
@@ -113,9 +116,12 @@ func ExampleRace_rejected() {
 	v, err := p.Await()
 	fmt.Printf("%#v %v\n", v, err)
 
+	time.Sleep(time.Second)
+
 	// Output:
 	// rejecting p2
 	// "" error
+	// resolving p1
 }
 
 func ExampleAny_fulfilled() {
