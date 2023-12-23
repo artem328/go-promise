@@ -1,0 +1,48 @@
+run:
+  deadline: 1m
+  issues-exit-code: 1
+
+issues:
+  include:
+    - EXC0012 # Validate that exported items have comments
+    - EXC0014 # Validate that comments have name of the item comment belongs to
+
+linters-settings:
+  gofmt:
+    simplify: true
+  gocritic:
+    enabled-tags:
+      - performance
+  misspell:
+    locale: US
+
+linters:
+  disable-all: true
+  enable:
+    - asciicheck
+    - dupl
+    - durationcheck
+    - errcheck
+    - errorlint
+    - exportloopref
+    - forcetypeassert
+    - goconst
+    - gocritic
+    - gocyclo
+    - gofmt
+    - goimports
+    - goprintffuncname
+    - gosec
+    - gosimple
+    - govet
+    - ineffassign
+    - lll
+    - makezero
+    - misspell
+    - nestif
+    - nilerr
+    - prealloc
+    - revive
+    - staticcheck
+    - typecheck
+    - unused
