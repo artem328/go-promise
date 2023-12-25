@@ -368,7 +368,7 @@ func TestPromiseThen(t *testing.T) {
 		p := Resolve(1)
 		seen := make(chan struct{})
 
-		p.Then(func(i int) *Promise[int] {
+		pt := p.Then(func(i int) *Promise[int] {
 			assert.Equal(t, 1, i)
 			close(seen)
 
@@ -383,13 +383,19 @@ func TestPromiseThen(t *testing.T) {
 				return false
 			}
 		}, 50*time.Millisecond, time.Millisecond)
+
+		if assert.Eventually(t, func() bool { return isDone(pt) }, 50*time.Millisecond, time.Millisecond) {
+			assertVal(t, 1, pt)
+			assertNoErr(t, pt)
+		}
 	})
 
 	t.Run("From Rejected", func(t *testing.T) {
-		p := Reject[any](errors.New("mock"))
+		err := errors.New("mock")
+		p := Reject[any](err)
 		seen := make(chan struct{})
 
-		p.Then(func(any) *Promise[any] {
+		pt := p.Then(func(any) *Promise[any] {
 			close(seen)
 
 			return nil
@@ -403,6 +409,11 @@ func TestPromiseThen(t *testing.T) {
 				return false
 			}
 		}, 50*time.Millisecond, time.Millisecond)
+
+		if assert.Eventually(t, func() bool { return isDone(pt) }, 50*time.Millisecond, time.Millisecond) {
+			assertNoVal(t, pt)
+			assertErr(t, err, pt)
+		}
 	})
 
 	t.Run("Chain Resolve", func(t *testing.T) {
@@ -431,6 +442,15 @@ func TestPromiseThen(t *testing.T) {
 			assertNoVal(t, p2)
 		}
 	})
+
+	t.Run("No Callback", func(t *testing.T) {
+		p := Resolve(1).Then(nil)
+
+		if assert.Eventually(t, func() bool { return isDone(p) }, 50*time.Millisecond, time.Millisecond) {
+			assertVal(t, 1, p)
+			assertNoErr(t, p)
+		}
+	})
 }
 
 func TestPromiseCatch(t *testing.T) {
@@ -438,7 +458,7 @@ func TestPromiseCatch(t *testing.T) {
 		p := Resolve(1)
 		seen := make(chan struct{})
 
-		p.Catch(func(err error) *Promise[int] {
+		pc := p.Catch(func(err error) *Promise[int] {
 			close(seen)
 			return nil
 		})
@@ -451,6 +471,11 @@ func TestPromiseCatch(t *testing.T) {
 				return false
 			}
 		}, 50*time.Millisecond, time.Millisecond)
+
+		if assert.Eventually(t, func() bool { return isDone(pc) }, 50*time.Millisecond, time.Millisecond) {
+			assertVal(t, 1, pc)
+			assertNoErr(t, pc)
+		}
 	})
 
 	t.Run("From Rejected", func(t *testing.T) {
@@ -458,7 +483,7 @@ func TestPromiseCatch(t *testing.T) {
 		p := Reject[any](mockErr)
 		seen := make(chan struct{})
 
-		p.Catch(func(err error) *Promise[any] {
+		pc := p.Catch(func(err error) *Promise[any] {
 			assert.Equal(t, mockErr, err)
 			close(seen)
 			return nil
@@ -472,6 +497,11 @@ func TestPromiseCatch(t *testing.T) {
 				return false
 			}
 		}, 50*time.Millisecond, time.Millisecond)
+
+		if assert.Eventually(t, func() bool { return isDone(pc) }, 50*time.Millisecond, time.Millisecond) {
+			assertNoVal(t, pc)
+			assertErr(t, mockErr, pc)
+		}
 	})
 
 	t.Run("Chain Resolve", func(t *testing.T) {
@@ -499,22 +529,177 @@ func TestPromiseCatch(t *testing.T) {
 			assertNoErr(t, p2)
 		}
 	})
+
+	t.Run("No Callback", func(t *testing.T) {
+		err := errors.New("mock")
+		p := Reject[any](err).Catch(nil)
+
+		if assert.Eventually(t, func() bool { return isDone(p) }, 50*time.Millisecond, time.Millisecond) {
+			assertNoVal(t, p)
+			assertErr(t, err, p)
+		}
+	})
+}
+
+func TestPromiseThenCatch(t *testing.T) {
+	t.Run("From Resolved", func(t *testing.T) {
+		p := Resolve(1)
+		seenThen := make(chan struct{})
+		seenCatch := make(chan struct{})
+
+		ptc := p.ThenCatch(
+			func(i int) *Promise[int] {
+				assert.Equal(t, 1, i)
+				close(seenThen)
+				return nil
+			},
+			func(err error) *Promise[int] {
+				close(seenCatch)
+				return nil
+			},
+		)
+
+		assert.Never(t, func() bool {
+			select {
+			case <-seenCatch:
+				return true
+			default:
+				return false
+			}
+		}, 50*time.Millisecond, time.Millisecond)
+
+		assert.Eventually(t, func() bool {
+			select {
+			case <-seenThen:
+				return true
+			default:
+				return false
+			}
+		}, 50*time.Millisecond, time.Millisecond)
+
+		if assert.Eventually(t, func() bool { return isDone(ptc) }, 50*time.Millisecond, time.Millisecond) {
+			assertVal(t, 1, ptc)
+			assertNoErr(t, ptc)
+		}
+	})
+
+	t.Run("From Rejected", func(t *testing.T) {
+		mockErr := errors.New("mock")
+		p := Reject[any](mockErr)
+		seenThen := make(chan struct{})
+		seenCatch := make(chan struct{})
+
+		ptc := p.ThenCatch(
+			func(any) *Promise[any] {
+				close(seenThen)
+				return nil
+			},
+			func(err error) *Promise[any] {
+				assert.Equal(t, mockErr, err)
+				close(seenCatch)
+				return nil
+			},
+		)
+
+		assert.Never(t, func() bool {
+			select {
+			case <-seenThen:
+				return true
+			default:
+				return false
+			}
+		}, 50*time.Millisecond, time.Millisecond)
+
+		assert.Eventually(t, func() bool {
+			select {
+			case <-seenCatch:
+				return true
+			default:
+				return false
+			}
+		}, 50*time.Millisecond, time.Millisecond)
+
+		if assert.Eventually(t, func() bool { return isDone(ptc) }, 50*time.Millisecond, time.Millisecond) {
+			assertNoVal(t, ptc)
+			assertErr(t, mockErr, ptc)
+		}
+	})
+
+	t.Run("Chain Resolve", func(t *testing.T) {
+		p1 := Resolve(1)
+		p2 := p1.ThenCatch(
+			func(i int) *Promise[int] {
+				assert.Equal(t, 1, i)
+				return Resolve(i + 1)
+			},
+			func(err error) *Promise[int] {
+				return Resolve(-1)
+			},
+		)
+
+		if assert.Eventually(t, func() bool { return isDone(p2) }, 50*time.Millisecond, time.Millisecond) {
+			assertVal(t, 2, p2)
+			assertNoErr(t, p2)
+		}
+	})
+
+	t.Run("Chain Reject", func(t *testing.T) {
+		mockErr := errors.New("mock")
+		p1 := Reject[int](mockErr)
+		p2 := p1.ThenCatch(
+			func(i int) *Promise[int] {
+				return Resolve(i + 1)
+			},
+			func(err error) *Promise[int] {
+				assert.Equal(t, mockErr, err)
+				return Resolve(-1)
+			},
+		)
+
+		if assert.Eventually(t, func() bool { return isDone(p2) }, 50*time.Millisecond, time.Millisecond) {
+			assertVal(t, -1, p2)
+			assertNoErr(t, p2)
+		}
+	})
+
+	t.Run("No Callback Resolve", func(t *testing.T) {
+		p := Resolve(1).ThenCatch(nil, nil)
+
+		if assert.Eventually(t, func() bool { return isDone(p) }, 50*time.Millisecond, time.Millisecond) {
+			assertVal(t, 1, p)
+			assertNoErr(t, p)
+		}
+	})
+
+	t.Run("No Callback Reject", func(t *testing.T) {
+		err := errors.New("mock")
+		p := Reject[any](err).ThenCatch(nil, nil)
+
+		if assert.Eventually(t, func() bool { return isDone(p) }, 50*time.Millisecond, time.Millisecond) {
+			assertNoVal(t, p)
+			assertErr(t, err, p)
+		}
+	})
 }
 
 func TestPromiseFinally(t *testing.T) {
+	mockErr := errors.New("mock")
+
 	tests := []struct {
 		name    string
 		promise *Promise[any]
+		wantVal any
+		wantErr error
 	}{
-		{name: "From Resolved", promise: Resolve[any](1)},
-		{name: "From Rejected", promise: Reject[any](errors.New("mock"))},
+		{name: "From Resolved", promise: Resolve[any](1), wantVal: 1, wantErr: nil},
+		{name: "From Rejected", promise: Reject[any](mockErr), wantVal: nil, wantErr: mockErr},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			seen := make(chan struct{})
 
-			tt.promise.Finally(func() *Promise[any] {
+			p := tt.promise.Finally(func() *Promise[any] {
 				close(seen)
 				return nil
 			})
@@ -527,6 +712,11 @@ func TestPromiseFinally(t *testing.T) {
 					return false
 				}
 			}, 50*time.Millisecond, time.Millisecond)
+
+			if assert.Eventually(t, func() bool { return isDone(p) }, 50*time.Millisecond, time.Millisecond) {
+				assertVal(t, tt.wantVal, p)
+				assertErr(t, tt.wantErr, p)
+			}
 		})
 	}
 
@@ -540,6 +730,19 @@ func TestPromiseFinally(t *testing.T) {
 				if assert.Eventually(t, func() bool { return isDone(p2) }, 50*time.Millisecond, time.Millisecond) {
 					assertVal(t, -1, p2)
 					assertNoErr(t, p2)
+				}
+			})
+		}
+	})
+
+	t.Run("No Callback", func(t *testing.T) {
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				p2 := tt.promise.Finally(nil)
+
+				if assert.Eventually(t, func() bool { return isDone(p2) }, 50*time.Millisecond, time.Millisecond) {
+					assertVal(t, tt.wantVal, p2)
+					assertErr(t, tt.wantErr, p2)
 				}
 			})
 		}

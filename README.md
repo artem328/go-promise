@@ -1,6 +1,7 @@
 # GoPromise
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/artem328/go-promise.svg)](https://pkg.go.dev/github.com/artem328/go-promise)
+[![Build](https://github.com/artem328/go-promise/actions/workflows/go.yml/badge.svg?branch=master)](https://github.com/artem328/go-promise/actions/workflows/go.yml)
 [![codecov](https://codecov.io/gh/artem328/go-promise/graph/badge.svg)](https://codecov.io/gh/artem328/go-promise)
 
 The promises API for Go with:
@@ -10,7 +11,7 @@ The promises API for Go with:
 
 ## Installation
 
-Add import to your go source code and thats it
+Add import to your go source code and that's it
 ```go
 import "github.com/artem328/go-promise"
 ```
