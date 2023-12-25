@@ -505,28 +505,30 @@ func TestPromiseCatch(t *testing.T) {
 	})
 
 	t.Run("Chain Resolve", func(t *testing.T) {
-		p1 := Resolve(1)
+		mockErr1 := errors.New("mock1")
+		p1 := Reject[int](mockErr1)
 		p2 := p1.Catch(func(err error) *Promise[int] {
-			return Resolve(-1)
-		})
-
-		if assert.Eventually(t, func() bool { return isDone(p2) }, 50*time.Millisecond, time.Millisecond) {
-			assertVal(t, 1, p2)
-			assertNoErr(t, p2)
-		}
-	})
-
-	t.Run("Chain Reject", func(t *testing.T) {
-		mockErr := errors.New("mock")
-		p1 := Reject[int](mockErr)
-		p2 := p1.Catch(func(err error) *Promise[int] {
-			assert.Equal(t, mockErr, err)
 			return Resolve(-1)
 		})
 
 		if assert.Eventually(t, func() bool { return isDone(p2) }, 50*time.Millisecond, time.Millisecond) {
 			assertVal(t, -1, p2)
 			assertNoErr(t, p2)
+		}
+	})
+
+	t.Run("Chain Reject", func(t *testing.T) {
+		mockErr1 := errors.New("mock1")
+		mockErr2 := errors.New("mock2")
+		p1 := Reject[int](mockErr1)
+		p2 := p1.Catch(func(err error) *Promise[int] {
+			assert.Equal(t, mockErr1, err)
+			return Reject[int](mockErr2)
+		})
+
+		if assert.Eventually(t, func() bool { return isDone(p2) }, 50*time.Millisecond, time.Millisecond) {
+			assertNoVal(t, p2)
+			assertErr(t, mockErr2, p2)
 		}
 	})
 

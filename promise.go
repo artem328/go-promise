@@ -93,8 +93,6 @@ func All[T any](promises ...*Promise[T]) *Promise[[]T] {
 	return New(func(resolve func([]T), reject func(error)) {
 		valCh := make(chan result[T], len(promises))
 		errCh := make(chan error, 1)
-		defer drain(valCh)
-		defer drain(errCh)
 		done := make(chan struct{})
 		defer close(done)
 
@@ -179,8 +177,6 @@ func Race[T any](promises ...*Promise[T]) *Promise[T] {
 	return New(func(resolve func(T), reject func(error)) {
 		valCh := make(chan T, 1)
 		errCh := make(chan error, 1)
-		drain(valCh)
-		drain(errCh)
 		done := make(chan struct{})
 		defer close(done)
 
@@ -226,8 +222,6 @@ func Any[T any](promises ...*Promise[T]) *Promise[T] {
 	return New(func(resolve func(T), reject func(error)) {
 		valCh := make(chan T, 1)
 		errCh := make(chan struct{}, len(promises))
-		defer drain(valCh)
-		defer drain(errCh)
 		done := make(chan struct{})
 		defer close(done)
 
@@ -483,12 +477,6 @@ func (p *Promise[T]) reject(err error) {
 type result[T any] struct {
 	i   int
 	val T
-}
-
-func drain[T any](c <-chan T) {
-	for len(c) > 0 {
-		<-c
-	}
 }
 
 func newPromise[T any]() *Promise[T] {
