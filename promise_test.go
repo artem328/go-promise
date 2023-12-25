@@ -51,6 +51,17 @@ func TestPromise(t *testing.T) {
 		}
 	})
 
+	t.Run("Reject Without Error", func(t *testing.T) {
+		p := New(func(resolve func(any), reject func(error)) {
+			reject(nil)
+		})
+
+		if assert.Eventually(t, func() bool { return isDone(p) }, 50*time.Millisecond, time.Millisecond) {
+			assertErr(t, ErrRejected, p)
+			assertNoVal(t, p)
+		}
+	})
+
 	t.Run("Callback Panic", func(t *testing.T) {
 		tests := []struct {
 			name     string
@@ -354,13 +365,74 @@ func TestResolve(t *testing.T) {
 }
 
 func TestReject(t *testing.T) {
-	err := errors.New("mock")
-	p := Reject[any](err)
+	t.Run("With Error", func(t *testing.T) {
+		err := errors.New("mock")
+		p := Reject[any](err)
 
-	if assertDone(t, p) {
-		assertNoVal(t, p)
-		assertErr(t, err, p)
+		if assertDone(t, p) {
+			assertNoVal(t, p)
+			assertErr(t, err, p)
+		}
+	})
+
+	t.Run("Without Error", func(t *testing.T) {
+		p := Reject[any](nil)
+
+		if assertDone(t, p) {
+			assertNoVal(t, p)
+			assertErr(t, ErrRejected, p)
+		}
+	})
+}
+
+func TestDiverge(t *testing.T) {
+	mockErr := errors.New("mock")
+
+	tests := []struct {
+		name    string
+		promise *Promise[any]
+		wantVal any
+		wantErr error
+	}{
+		{name: "From Resolved", promise: Resolve[any](1), wantVal: 1, wantErr: nil},
+		{name: "From Rejected", promise: Reject[any](mockErr), wantVal: nil, wantErr: mockErr},
 	}
+
+	t.Run("Resolve", func(t *testing.T) {
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				p := Diverge(tt.promise, func(v any, err error) (string, error) {
+					assert.Equal(t, tt.wantVal, v)
+					assert.Equal(t, tt.wantErr, err)
+					return "1", nil
+				})
+
+				if assert.Eventually(t, func() bool { return isDone(p) }, 50*time.Millisecond, time.Millisecond) {
+					assertVal(t, "1", p)
+					assertNoErr(t, p)
+				}
+			})
+		}
+	})
+
+	t.Run("Reject", func(t *testing.T) {
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				mockErrInner := errors.New("mock error inner")
+
+				p := Diverge(tt.promise, func(v any, err error) (string, error) {
+					assert.Equal(t, tt.wantVal, v)
+					assert.Equal(t, tt.wantErr, err)
+					return "", mockErrInner
+				})
+
+				if assert.Eventually(t, func() bool { return isDone(p) }, 50*time.Millisecond, time.Millisecond) {
+					assertNoVal(t, p)
+					assertErr(t, mockErrInner, p)
+				}
+			})
+		}
+	})
 }
 
 func TestPromiseThen(t *testing.T) {
@@ -794,6 +866,48 @@ func TestPromiseSettled(t *testing.T) {
 	resolve("done")
 
 	assert.True(t, isSettled())
+}
+
+func TestPromiseState(t *testing.T) {
+	t.Run("Pending", func(t *testing.T) {
+		p, _, _ := WithResolvers[any]()
+
+		assert.Equal(t, Pending, p.State())
+	})
+
+	t.Run("Fulfilled", func(t *testing.T) {
+		p, resolve, _ := WithResolvers[any]()
+
+		resolve("done")
+
+		assert.Equal(t, Fulfilled, p.State())
+	})
+
+	t.Run("Rejected", func(t *testing.T) {
+		p, _, reject := WithResolvers[any]()
+
+		reject(nil)
+
+		assert.Equal(t, Rejected, p.State())
+	})
+}
+
+func TestStateString(t *testing.T) {
+	tests := []struct {
+		state State
+		want  string
+	}{
+		{state: Pending, want: "pending"},
+		{state: Fulfilled, want: "fulfilled"},
+		{state: Rejected, want: "rejected"},
+		{state: 3, want: "invalid"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.want, func(t *testing.T) {
+			assert.Equal(t, tt.want, tt.state.String())
+		})
+	}
 }
 
 type stringerImpl struct {

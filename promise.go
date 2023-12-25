@@ -9,19 +9,26 @@ import (
 
 // States of promise
 const (
-	Fulfilled State = "fulfilled"
-	Rejected  State = "rejected"
+	Pending State = iota
+	Fulfilled
+	Rejected
 )
 
 // Predefined errors
 var (
 	ErrAllPromisesRejected = errors.New("all promises rejected")
 	ErrNoRacers            = errors.New("no racers")
+	// ErrRejected is a generic error returned in case reject was called with nil.
+	// Assume promise p and reject callback
+	//
+	//	reject(nil)
+	//	_, err := p.Await() // err == ErrRejected
+	ErrRejected = errors.New("rejected")
 )
 
 type (
 	// State represents a promise's state
-	State string
+	State uint8
 
 	// Promise is the state struct for a single promise.
 	// Use promise constructors to create a promise.
@@ -145,13 +152,8 @@ func AllSettled[T any](promises ...*Promise[T]) *Promise[[]State] {
 
 		for i := 0; i < len(promises); i++ {
 			go func(i int) {
-				_, err := promises[i].Await()
-				if err != nil {
-					resCh <- result[State]{i: i, val: Rejected}
-					return
-				}
-
-				resCh <- result[State]{i: i, val: Fulfilled}
+				<-promises[i].Settled()
+				resCh <- result[State]{i: i, val: promises[i].State()}
 			}(i)
 		}
 
@@ -260,8 +262,7 @@ func Any[T any](promises ...*Promise[T]) *Promise[T] {
 // Resolve returns fulfilled promise with value provided as argument.
 func Resolve[T any](v T) *Promise[T] {
 	p := newPromise[T]()
-	p.val = v
-	close(p.done)
+	p.resolve(v)
 
 	return p
 }
@@ -269,10 +270,32 @@ func Resolve[T any](v T) *Promise[T] {
 // Reject returns rejected promise with error provided as argument.
 func Reject[T any](err error) *Promise[T] {
 	p := newPromise[T]()
-	p.err = err
-	close(p.done)
+	p.reject(err)
 
 	return p
+}
+
+// Diverge returns new promise of type N that will be settled after the promise of type T
+// will is settled and the resulting value and error are processed with the f function.
+//
+// This is a helper function similar to [Promise.ThenCatch] or [Promise.Finally] which allows conversion
+// from promise of one type to the promise of another.
+//
+// NOTE: the function f accepts two parameters, the value of type T and error.
+// If error is a non-nil value then promise is rejected, otherwise it is fulfilled.
+// The returned values N and error indicate whether the new promise is rejected or fulfilled.
+// If error is not nil then the promise always rejected (no matter what N value returned), and
+// vice versa if error is nil, then promise is considered fulfilled (even if the N value is empty)
+func Diverge[T, N any](p *Promise[T], f func(T, error) (N, error)) *Promise[N] {
+	return New(func(resolve func(N), reject func(error)) {
+		v, err := f(p.Await())
+		if err != nil {
+			reject(err)
+			return
+		}
+
+		resolve(v)
+	})
 }
 
 // Then returns a new equivalent promise instance that will call onFulfilled function when the current
@@ -398,6 +421,8 @@ func (p *Promise[T]) Finally(onFinally func() *Promise[T]) *Promise[T] {
 // The error will be a non-nil value if promise is rejected.
 //
 // The method will always return the same result after the promise is settled.
+// NOTE: a promise does not store a copy of the result, therefore if value is modified
+// by pointer it will affect the result returned from Await.
 //
 // To test if Await could block the execution the [Promise.Settled] can be used.
 func (p *Promise[T]) Await() (T, error) {
@@ -419,6 +444,35 @@ func (p *Promise[T]) Await() (T, error) {
 //	}
 func (p *Promise[T]) Settled() <-chan struct{} {
 	return p.done
+}
+
+// State returns the state of current promise
+func (p *Promise[T]) State() State {
+	select {
+	case <-p.done:
+	default:
+		return Pending
+	}
+
+	if p.err != nil {
+		return Rejected
+	}
+
+	return Fulfilled
+}
+
+// String is implementation of fmt.Stringer
+func (s State) String() string {
+	switch s {
+	case Pending:
+		return "pending"
+	case Fulfilled:
+		return "fulfilled"
+	case Rejected:
+		return "rejected"
+	default:
+		return "invalid"
+	}
 }
 
 func (p *Promise[T]) then(onFulfilled func(T) *Promise[T], onRejected func(error) *Promise[T]) *Promise[T] {
@@ -469,6 +523,10 @@ func (p *Promise[T]) resolve(val T) {
 
 func (p *Promise[T]) reject(err error) {
 	p.once.Do(func() {
+		if err == nil {
+			err = ErrRejected
+		}
+
 		p.err = err
 		close(p.done)
 	})

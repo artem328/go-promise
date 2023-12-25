@@ -208,6 +208,32 @@ func ExampleReject() {
 	// Output: 0 error
 }
 
+func ExampleDiverge() {
+	p := promise.Resolve([]byte("hello")) // *Promise[[]byte]
+
+	pDiverged := promise.Diverge(p, func(v []byte, err error) (string, error) {
+		if err != nil {
+			// The code inside this if-block is equivalent of Promise.Catch
+			return "", err // The error return is equivalent to reject
+		}
+
+		// therefore err == nil is equivalent of Promise.Then
+		//
+		// the callback is not limit to Promise.Then and Promise.Catch
+		// and can be easily used as Promise.Finally
+
+		// return nil error means resolve
+		return string(v), nil
+	}) // *Promise[string]
+
+	fmt.Println(p.Await())
+	fmt.Println(pDiverged.Await())
+
+	//Output:
+	// [104 101 108 108 111] <nil>
+	// hello <nil>
+}
+
 func ExamplePromise_Then() {
 	p := promise.Resolve(1).
 		Then(func(i int) *promise.Promise[int] {
