@@ -281,74 +281,60 @@ func Reject[T any](err error) *Promise[T] {
 	return p
 }
 
-// Then returns a new equivalent promise instance that will call f function when the current
+// Then returns a new equivalent promise instance that will call onFulfilled function when the current
 // promise is fulfilled before fulfilling the returned promise.
 //
-// The f function can return another promise to provide promise chaining. In this case
-// the returned promise will settle after the f-returned promise is settled.
+// The onFulfilled function can return another promise to provide promise chaining. In this case
+// the returned promise will settle after the returned promise from onFulfilled is settled.
 //
 //	var p1 *Promise[int]
 //	p2 := p1.Then(func(i int) *Promise[int] {
 //		return Promise.resolve(i * 2)
 //	}) // p2 will be settled after Promise.resolve(i * 2) is settled
 //
-// If the f function returns nil the returned promise is fulfilled right after the f func is finished.
+// If the onFulfilled function returns nil
+// the returned promise is fulfilled right after the onFulfilled func is finished.
 //
 //	var p1 *Promise[int]
 //	p2 := p1.Then(func(i int) *Promise[int] {
 //		doSomething()
 //		return nil
 //	}) // p2 will be fulfilled after doSomething() is finished and nil is returned.
-func (p *Promise[T]) Then(f func(T) *Promise[T]) *Promise[T] {
-	return New(func(resolve func(T), reject func(error)) {
-		v, err := p.Await()
-		if err != nil {
-			reject(err)
-			return
-		}
-
-		next := f(v)
-		if next == nil {
-			resolve(v)
-			return
-		}
-
-		v, err = next.Await()
-		if err != nil {
-			reject(err)
-			return
-		}
-		resolve(v)
-	})
+func (p *Promise[T]) Then(onFulfilled func(T) *Promise[T]) *Promise[T] {
+	return p.then(onFulfilled, nil)
 }
 
-// Catch returns a new equivalent promise instance that will call f function when the current
+// Catch returns a new equivalent promise instance that will call onRejected function when the current
 // promise is rejected before rejecting the returned promise.
 //
-// The f function can return another promise to provide promise chaining. In this case
-// the returned promise will settle after the f-returned promise is settled.
+// The onRejected function can return another promise to provide promise chaining. In this case
+// the returned promise will settle after the returned promise from onRejected is settled.
 //
 //	var p1 *Promise[int]
 //	p2 := p1.Catch(func(err error) *Promise[int] {
 //		return Promise.resolve("caught")
 //	}) // p2 will be settled after Promise.resolve("caught") is settled
 //
-// If the f function returns nil the returned promise is rejected right after the f func is finished.
+// If the onRejected function returns nil the returned promise is rejected
+// right after the onRejected func is finished.
 //
 //	var p1 *Promise[int]
 //	p2 := p1.Catch(func(err error) *Promise[int] {
 //		doSomething()
 //		return nil
 //	}) // p2 will be rejected after doSomething() is finished and nil is returned.
-func (p *Promise[T]) Catch(f func(error) *Promise[T]) *Promise[T] {
+func (p *Promise[T]) Catch(onRejected func(error) *Promise[T]) *Promise[T] {
 	return New(func(resolve func(T), reject func(error)) {
 		v, err := p.Await()
 		if err == nil {
 			resolve(v)
 			return
+		} else if onRejected == nil {
+			reject(err)
+			return
 		}
 
-		next := f(err)
+		next := onRejected(err)
 		if next == nil {
 			reject(err)
 			return
@@ -363,31 +349,45 @@ func (p *Promise[T]) Catch(f func(error) *Promise[T]) *Promise[T] {
 	})
 }
 
-// Finally returns a new equivalent promise instance that will call f function when the current
+// ThenCatch is similar to [Promise.Then] except the fact that it also accepts onRejected callback,
+// which is called in case the promise is rejected.
+// The onRejected function can return a new promise. See more details in [Promise.Catch].
+//
+// Note: p.Then(onFulfilled).Catch(onRejected) chain differs from ThenCatch since it produces only one promise,
+// thus only one goroutine. While each chain call produces a new promise with dedicated goroutine, which means
+// p.Then(onFulfilled).Catch(onRejected) will spawn two goroutines.
+func (p *Promise[T]) ThenCatch(onFulfilled func(T) *Promise[T], onRejected func(error) *Promise[T]) *Promise[T] {
+	return p.then(onFulfilled, onRejected)
+}
+
+// Finally returns a new equivalent promise instance that will call onFinally function when the current
 // promise is settled regardless of its state before settling the returned promise.
 //
-// The f function can return another promise to provide promise chaining. In this case
-// the returned promise will settle after the f-returned promise is settled.
+// The onFinally function can return another promise to provide promise chaining. In this case
+// the returned promise will settle after the returned promise from onFinally is settled.
 //
 //	var p1 *Promise[int]
 //	p2 := p1.Finally(func(err error) *Promise[int] {
 //		return Promise.resolve("caught")
 //	}) // p2 will be settled after Promise.resolve("caught") is settled
 //
-// If the f function returns nil the returned promise is settled right after the f func is finished.
+// If the onFinally function returns nil the returned promise is settled
+// right after the onFinally func is finished.
 //
 //	var p1 *Promise[int]
 //	p2 := p1.Finally(func(err error) *Promise[int] {
 //		doSomething()
 //		return nil
 //	}) // p2 will be settled after doSomething() is finished and nil is returned.
-func (p *Promise[T]) Finally(f func() *Promise[T]) *Promise[T] {
+func (p *Promise[T]) Finally(onFinally func() *Promise[T]) *Promise[T] {
 	return New(func(resolve func(T), reject func(error)) {
 		v, err := p.Await()
 
-		next := f()
-		if next != nil {
-			v, err = next.Await()
+		if onFinally != nil {
+			next := onFinally()
+			if next != nil {
+				v, err = next.Await()
+			}
 		}
 
 		if err != nil {
@@ -425,6 +425,45 @@ func (p *Promise[T]) Await() (T, error) {
 //	}
 func (p *Promise[T]) Settled() <-chan struct{} {
 	return p.done
+}
+
+func (p *Promise[T]) then(onFulfilled func(T) *Promise[T], onRejected func(error) *Promise[T]) *Promise[T] {
+	return New(func(resolve func(T), reject func(error)) {
+		var next *Promise[T]
+
+		v, err := p.Await()
+		switch err {
+		case nil:
+			if onFulfilled == nil {
+				resolve(v)
+				return
+			}
+
+			next = onFulfilled(v)
+			if next == nil {
+				resolve(v)
+				return
+			}
+		default:
+			if onRejected == nil {
+				reject(err)
+				return
+			}
+
+			next = onRejected(err)
+			if next == nil {
+				reject(err)
+				return
+			}
+		}
+
+		v, err = next.Await()
+		if err != nil {
+			reject(err)
+			return
+		}
+		resolve(v)
+	})
 }
 
 func (p *Promise[T]) resolve(val T) {
